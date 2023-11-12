@@ -1,0 +1,12 @@
+[submodule "deps/FSMM"]
+	path = deps/FSMM
+	url = https://github.com/Fexcraft/FSMM
+[submodule "deps/FCL"]
+	path = deps/FCL
+	url = git@github.com:Fexcraft/FCL.git
+[submodule "deps/FCLN"]
+	path = deps/FCLN
+	url = git@github.com:fexcraft-net/FCLN.git
+[submodule "deps/Json"]
+	path = deps/Json
+	url = git@github.com:fexcraft-net/Json.git
