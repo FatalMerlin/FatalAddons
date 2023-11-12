@@ -1,0 +1,13 @@
+pluginManagement {
+    repositories {
+        // Add the MinecraftForge maven
+        maven {
+            name 'Garden of Fancy'
+            url 'https://maven.gofancy.wtf/releases'
+        }
+        maven {
+            name 'Minecraft Forge'
+            url 'https://maven.minecraftforge.net/'
+        }
+    }
+}

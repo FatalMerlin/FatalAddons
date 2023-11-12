@@ -1,0 +1,16 @@
+[
+{
+  "modid": "fataladdons",
+  "name": "FatalAddons",
+  "description": "Various Addons for Minecraft",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "https://github.com/FatalMerlin/FatalAddons",
+  "updateUrl": "",
+  "authorList": ["FatalMerlin"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
