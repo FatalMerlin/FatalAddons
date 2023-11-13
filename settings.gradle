@@ -11,3 +11,10 @@ pluginManagement {
         }
     }
 }
+
+include ':FSMM'
+project(':FSMM').projectDir = new File(settingsDir, 'deps/FSMM')
+
+// required to overwrite the static project path in FSMM
+include ':FCL'
+project(':FCL').projectDir = new File(settingsDir, 'deps/FCL')
