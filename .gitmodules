@@ -1,6 +1,6 @@
 [submodule "deps/FSMM"]
 	path = deps/FSMM
-	url = https://github.com/Fexcraft/FSMM
+	url = git@github.com:Fexcraft/FSMM.git
 [submodule "deps/FCL"]
 	path = deps/FCL
 	url = git@github.com:Fexcraft/FCL.git
