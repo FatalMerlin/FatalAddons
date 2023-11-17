@@ -1,6 +1,8 @@
 package com.fataldream.FatalAddons.fsmm.util;
 
 import com.fataldream.FatalAddons.fsmm.data.TransferRequest;
+import com.fataldream.FatalAddons.util.ChatUtils;
+import com.fataldream.FatalAddons.util.PlayerUtils;
 import com.mojang.authlib.GameProfile;
 import li.cil.oc.api.machine.Context;
 import net.fexcraft.mod.fsmm.data.Account;
@@ -8,22 +10,17 @@ import net.fexcraft.mod.fsmm.data.Bank;
 import net.fexcraft.mod.fsmm.util.Config;
 import net.fexcraft.mod.fsmm.util.DataManager;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextFormatting;
-import net.minecraft.util.text.event.ClickEvent;
-import net.minecraftforge.fml.common.FMLCommonHandler;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author FatalMerlin (merlin.brandes@gmail.com)
  */
 public class TransferManager {
     private static TransferManager instance;
-    private final HashMap<String, TransferRequest> requests = new HashMap<>();
-    // TODO: Remove transfers after 60 seconds
+    public static final int REQUEST_EXPIRY_SECONDS = 60;
+    private final HashMap<UUID, LinkedHashMap<UUID, TransferRequest>> requests = new HashMap<>();
 
     private TransferManager() {
     }
@@ -45,39 +42,33 @@ public class TransferManager {
      * @param amount     the amount of the transfer
      * @param context    the context of the transfer
      */
-    public void requestTransfer(String fromPlayer, String toPlayer, double amount, Context context) {
-        requests.put(fromPlayer, new TransferRequest(fromPlayer, toPlayer, amount, context));
+    public UUID requestTransfer(GameProfile fromPlayer, GameProfile toPlayer, double amount, Context context, String description) {
+        TransferRequest request = new TransferRequest(fromPlayer, toPlayer, amount, context, description);
 
-        EntityPlayerMP player = FMLCommonHandler.instance().getMinecraftServerInstance().getPlayerList().getPlayerByUsername(fromPlayer);
+        if (!requests.containsKey(fromPlayer.getId())) {
+            requests.put(fromPlayer.getId(), new LinkedHashMap<>());
+        }
+
+        requests.get(fromPlayer.getId()).put(request.getId(), request);
+
+        EntityPlayerMP player = PlayerUtils.getPlayer(fromPlayer);
 
         if (player != null) {
-            player.sendMessage(new TextComponentString("=== \u00a7bNew transfer request\u00a7r ==="));
-            player.sendMessage(new TextComponentString("\u00a7bTo\u00a7r: \u00a7a" + toPlayer));
-            player.sendMessage(new TextComponentString("\u00a7bAmount\u00a7r: \u00a7a" + amount + "\u00a77F$"));
-            player.sendMessage(new TextComponentString("Use ")
-                    .appendSibling(new TextComponentString("/fsmm transfer accept").setStyle(
-                            new Style()
-                                    .setColor(TextFormatting.GREEN)
-                                    .setUnderlined(true)
-                                    .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/fsmm transfer accept"))))
-                    .appendSibling(new TextComponentString(" to accept it or "))
-                    .appendSibling(new TextComponentString("/fsmm transfer reject").setStyle(
-                            new Style()
-                                    .setColor(TextFormatting.RED)
-                                    .setUnderlined(true)
-                                    .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/fsmm transfer reject"))))
-                    .appendSibling(new TextComponentString(" to reject it"))
-            );
-            player.sendMessage(new TextComponentString("Use ").appendSibling(
-                    new TextComponentString("/fsmm").setStyle(
-                            new Style()
-                                    .setColor(TextFormatting.AQUA)
-                                    .setUnderlined(true)
-                                    .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/fsmm"))
-                    ).appendSibling(new TextComponentString("\u00a7r to check your current balance").setStyle(new Style()))
+            ChatUtils.sendMessage(player, String.join("\n",
+                    "\n=== &bNew transfer request&r ===",
+                    request.toString(),
+                    "========= &bActions&r =========",
+                    String.format(
+                            "&r[[&a&nAccept&r]](/fsmm transfer accept %s) " +
+                                    "&r[[&c&nReject&r]](/fsmm transfer reject %s) " +
+                                    "&r[[&b&nMy Balance&r]](/fsmm)",
+                            request.getId().toString(),
+                            request.getId().toString()),
+                    "==========================" // this is padding after the button because the underline overlaps the next line
             ));
-            player.sendMessage(new TextComponentString("The request will be automatically \u00a7crejected\u00a7r in \u00a7b60\u00a7r seconds"));
         }
+
+        return request.getId();
     }
 
     /**
@@ -87,14 +78,41 @@ public class TransferManager {
      * @param fromPlayer the player who sent the request
      * @param accepted   whether the request has been accepted or not
      */
-    private void replyToTransferRequest(String fromPlayer, boolean accepted) {
-        TransferRequest request = requests.get(fromPlayer);
-        if (request == null) return;
-        if (accepted) {
-            accepted = executeTransferRequest(request.getFromPlayer(), request.getToPlayer(), request.getAmount());
+    void replyToTransferRequest(EntityPlayerMP fromPlayer, UUID requestId, boolean accepted) {
+        GameProfile profile = fromPlayer.getGameProfile();
+
+        if (!hasTransferRequest(profile, requestId)) {
+            ChatUtils.sendMessage(
+                    fromPlayer,
+                    "&cNo transfer request with id &b" + requestId + "&r"
+            );
+            return;
         }
-        request.getContext().signal("fsmm_transfer", request.getFromPlayer(), request.getToPlayer(), request.getAmount(), accepted);
-        requests.remove(request.getFromPlayer());
+
+        HashMap<UUID, TransferRequest> playerRequests = requests.get(profile.getId());
+        TransferRequest request = requests.get(profile.getId()).get(requestId);
+
+        if (accepted) {
+            accepted = executeTransferRequest(fromPlayer, request.getToPlayer(), request.getAmount());
+        } else {
+            ChatUtils.sendMessage(
+                    fromPlayer,
+                    "&cTransfer request rejected"
+            );
+        }
+        sendSignalToRequestContext(request, accepted);
+        playerRequests.remove(requestId);
+    }
+
+    private void sendSignalToRequestContext(TransferRequest request, boolean success) {
+        request.getContext().signal(
+                "fsmm_transfer",
+                request.getId().toString(),
+                request.getFromPlayer().getName(),
+                request.getToPlayer().getName(),
+                request.getAmount(),
+                success
+        );
     }
 
     /**
@@ -105,20 +123,15 @@ public class TransferManager {
      * @param amount     the amount to be transferred
      * @return true if the transfer was successful, false otherwise
      */
-    private boolean executeTransferRequest(String fromPlayer, String toPlayer, double amount) {
+    private boolean executeTransferRequest(EntityPlayerMP fromPlayer, GameProfile toPlayer, double amount) {
         boolean success = false;
         long actualAmount = (long) (amount * 1000);
 
         Map<String, Account> accounts = DataManager.getAccountsOfType("player");
         if (accounts == null) return false;
 
-        String fromUUID = getUuidFromUsername(fromPlayer);
-        String toUUID = getUuidFromUsername(toPlayer);
-
-        Account fromAccount = accounts.get(fromUUID);
-        Account toAccount = accounts.get(toUUID);
-
-        EntityPlayerMP player = FMLCommonHandler.instance().getMinecraftServerInstance().getPlayerList().getPlayerByUsername(fromPlayer);
+        Account fromAccount = accounts.get(fromPlayer.getGameProfile().getId().toString());
+        Account toAccount = accounts.get(toPlayer.getId().toString());
 
         // bank should do the null-check on toAccount
         if (fromAccount != null) {
@@ -126,13 +139,14 @@ public class TransferManager {
             fixAccountBank(toAccount);
 
             Bank bank = fromAccount.getBank();
-            success = bank.processAction(Bank.Action.TRANSFER, player, fromAccount, actualAmount, toAccount, false);
+            success = bank.processAction(Bank.Action.TRANSFER, fromPlayer, fromAccount, actualAmount, toAccount, false);
         }
 
-        if (!success) {
-            player.sendMessage(new TextComponentString("\u00a7cError executing transaction: Check available balance."));
+        if (success) {
+            ChatUtils.sendMessage(fromPlayer, "&aTransaction successful! New balance: &r"
+                    + Config.getWorthAsString(fromAccount.getBalance()));
         } else {
-            player.sendMessage(new TextComponentString("\u00a7aTransaction successful! New balance: \u00a7r" + Config.getWorthAsString(fromAccount.getBalance())));
+            ChatUtils.sendMessage(fromPlayer, "&cError executing transaction: Insufficient funds.");
         }
 
         return success;
@@ -150,44 +164,45 @@ public class TransferManager {
     }
 
     /**
-     * Retrieves the UUID associated with the given username.
-     *
-     * @param username the username for which to retrieve the UUID
-     * @return the UUID associated with the given username, or null if the username is not found
-     */
-    private String getUuidFromUsername(String username) {
-        GameProfile profile = FMLCommonHandler.instance().getMinecraftServerInstance().getPlayerProfileCache().getGameProfileForUsername(username);
-        return profile == null ? null : profile.getId().toString();
-    }
-
-    /**
-     * Accepts a transfer request from a player.
-     * Used by the `/fsmm accept` command.
-     *
-     * @param fromPlayer the player who sent the transfer request
-     * @return void
-     */
-    public void acceptTransferRequest(String fromPlayer) {
-        replyToTransferRequest(fromPlayer, true);
-    }
-
-    /**
-     * Rejects a transfer request from a player.
-     * Used by the `/fsmm reject` command.
-     *
-     * @param fromPlayer the player who sent the transfer request
-     */
-    public void rejectTransferRequest(String fromPlayer) {
-        replyToTransferRequest(fromPlayer, false);
-    }
-
-    /**
      * Checks if there is a transfer request for the given player.
      *
      * @param fromPlayer the name of the player to check for a transfer request
      * @return true if there is a transfer request for the player, false otherwise
      */
-    public boolean hasTransferRequest(String fromPlayer) {
-        return requests.containsKey(fromPlayer);
+    public boolean hasTransferRequest(GameProfile fromPlayer, UUID requestId) {
+        return requests.containsKey(fromPlayer.getId()) && requests.get(fromPlayer.getId()).containsKey(requestId);
+    }
+
+    public void listTransferRequests(EntityPlayerMP player) {
+        HashMap<UUID, TransferRequest> playerRequests = requests.get(player.getGameProfile().getId());
+        ChatUtils.sendMessage(player, String.join("\n",
+                "=== &bTransfer Requests&r ===",
+                playerRequests == null || playerRequests.isEmpty() ? "No Transfer Requests." : playerRequests.values().stream()
+                        .map(TransferRequest::toString)
+                        .collect(Collectors.joining("=========================\n"))
+        ));
+    }
+
+    protected void cleanupRequests() {
+        Date now = new Date();
+
+        for (Map.Entry<UUID, LinkedHashMap<UUID, TransferRequest>> entry : requests.entrySet()) {
+            LinkedHashMap<UUID, TransferRequest> playerRequests = entry.getValue();
+            for (TransferRequest request : playerRequests.values()) {
+                if (request.getExpiryDate().before(now)) {
+                    playerRequests.remove(request.getId());
+                    sendSignalToRequestContext(request, false);
+                } else {
+                    // if we encounter a value that is not yet expired, we can stop the loop as the LinkedHashMap is
+                    // ordered by insertion order
+                    break;
+                }
+            }
+
+            // clean up the map if it is empty to save memory and processing time for the next iteration
+            if (playerRequests.isEmpty()) {
+                requests.remove(entry.getKey());
+            }
+        }
     }
 }

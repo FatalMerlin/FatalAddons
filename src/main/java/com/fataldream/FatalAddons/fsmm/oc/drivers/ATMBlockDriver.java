@@ -13,7 +13,7 @@ import net.minecraft.world.World;
 /**
  * @author FatalMerlin (merlin.brandes@gmail.com)
  */
-public class ATMDriver implements DriverBlock {
+public class ATMBlockDriver implements DriverBlock {
     /**
      * Determines if the given block at the specified position in the specified world
      * works with the ATM driver.
@@ -47,6 +47,6 @@ public class ATMDriver implements DriverBlock {
      * Registers the ATMDriver with the Driver class.
      */
     public static void register() {
-        Driver.add(new ATMDriver());
+        Driver.add(new ATMBlockDriver());
     }
 }

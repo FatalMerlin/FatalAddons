@@ -1,6 +1,11 @@
 package com.fataldream.FatalAddons.fsmm.data;
 
+import com.fataldream.FatalAddons.fsmm.util.TransferManager;
+import com.mojang.authlib.GameProfile;
 import li.cil.oc.api.machine.Context;
+
+import java.util.Date;
+import java.util.UUID;
 
 /**
  * Represents a transfer request made by a player.
@@ -8,10 +13,15 @@ import li.cil.oc.api.machine.Context;
  * @author FatalMerlin (merlin.brandes@gmail.com)
  */
 public class TransferRequest {
-    private final String fromPlayer;
-    private final String toPlayer;
+    private final UUID id = UUID.randomUUID();
+    private final GameProfile fromPlayer;
+    private final GameProfile toPlayer;
     private final double amount;
     private final Context context;
+
+    private final String description;
+
+    private final Date expiryDate = new Date(new Date().getTime() + TransferManager.REQUEST_EXPIRY_SECONDS * 1000);
 
     // TODO: change from player name to GameProfile with username AND uuid
     /**
@@ -22,19 +32,20 @@ public class TransferRequest {
      * @param amount      the amount of the transfer request
      * @param context     the OpenComputers API context to send a signal detailing the transfer result
      */
-    public TransferRequest(String fromPlayer, String toPlayer, double amount, Context context) {
+    public TransferRequest(GameProfile fromPlayer, GameProfile toPlayer, double amount, Context context, String description) {
 
         this.fromPlayer = fromPlayer;
         this.toPlayer = toPlayer;
         this.amount = amount;
         this.context = context;
+        this.description = description;
     }
 
-    public String getFromPlayer() {
+    public GameProfile getFromPlayer() {
         return fromPlayer;
     }
 
-    public String getToPlayer() {
+    public GameProfile getToPlayer() {
         return toPlayer;
     }
 
@@ -44,5 +55,28 @@ public class TransferRequest {
 
     public Context getContext() {
         return context;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Date getExpiryDate() {
+        return expiryDate;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return String.join("\n",
+                "&bId&r: &a" + id,
+                "&bTo&r: &a" + toPlayer.getName(),
+                "&bAmount&r: &a" + amount + "&7F$",
+                "&bDescription&r: &a" + description,
+                "&bExpires in&r: &a" + ((expiryDate.getTime() - new Date().getTime()) / 1000) + " seconds"
+        );
     }
 }

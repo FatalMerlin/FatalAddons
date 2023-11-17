@@ -4,9 +4,9 @@ plugins {
     id 'wtf.gofancy.fancygradle' version '1.1.+'
 }
 
-version = '1.0'
-group = 'com.yourname.modid' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
-archivesBaseName = 'modid'
+version = '1.12.2-1.0'
+group = 'com.fataldream.fataladdons' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
+archivesBaseName = 'FatalAddons'
 
 sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8' // Need this here so eclipse task generates correctly.
 
@@ -90,7 +90,7 @@ dependencies {
     runtimeOnly "li.cil.oc:OpenComputers:MC1.12.2-1.7.5.221"
 
     implementation project(':FSMM')
-    implementation "li.cil.oc:OpenComputers:MC1.12.2-1.7.5.221:api"
+    compileOnly "li.cil.oc:OpenComputers:MC1.12.2-1.7.5.221"
 }
 
 // Example for how to get properties into the manifest for reading by the runtime..
