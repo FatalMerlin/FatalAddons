@@ -63,7 +63,7 @@ public class ATMEnvironment extends AbstractManagedEnvironment {
         // TODO: Check if players exist in the Server and / or have accounts
         // TODO: Intentionally do NOT check balance as that is done by the bank and could be used to exploit this command to check other players balance
 
-        UUID transactionId = TransferManager.getInstance().requestTransfer(fromPlayer, toPlayer, amount, context, description);
+        UUID transactionId = TransferManager.getInstance().requestTransfer(fromPlayer, toPlayer, amount, description);
 
         return new Object[]{null, transactionId.toString()};
     }

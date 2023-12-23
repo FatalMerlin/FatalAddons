@@ -8,6 +8,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.event.ClickEvent;
 import net.minecraft.util.text.event.HoverEvent;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,7 +21,8 @@ public class ChatUtils {
     private static final Pattern CLICK_EVENT_PATTERN = Pattern.compile(PARAGRAPH + "([rsu])\\[(.*?)\\]\\((\\/.*?)\\)");
 
     // TODO: switch to rest parameter?
-    public static void sendMessage(ICommandSender sender, String message) {
+    public static void sendMessage(@Nullable ICommandSender sender, String message) {
+        if (sender == null) return;
         Arrays.stream(message.split("\n")).map(ChatUtils::parse).forEach(sender::sendMessage);
     }
 

@@ -11,6 +11,7 @@ import net.fexcraft.mod.fsmm.util.Config;
 import net.fexcraft.mod.fsmm.util.DataManager;
 import net.minecraft.entity.player.EntityPlayerMP;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,10 +41,23 @@ public class TransferManager {
      * @param fromPlayer the name of the player sending the transfer
      * @param toPlayer   the name of the player receiving the transfer
      * @param amount     the amount of the transfer
+     */
+    public UUID requestTransfer(GameProfile fromPlayer, GameProfile toPlayer, double amount, String description) {
+        return requestTransfer(fromPlayer, toPlayer, amount, description, null);
+    }
+
+    /**
+     * Requests a transfer from one player to another, and stores the transfer for use with the
+     * /fsmm accept and /fsmm reject commands.
+     * Also notifies the player that a transfer request has been sent.
+     *
+     * @param fromPlayer the name of the player sending the transfer
+     * @param toPlayer   the name of the player receiving the transfer
+     * @param amount     the amount of the transfer
      * @param context    the context of the transfer
      */
-    public UUID requestTransfer(GameProfile fromPlayer, GameProfile toPlayer, double amount, Context context, String description) {
-        TransferRequest request = new TransferRequest(fromPlayer, toPlayer, amount, context, description);
+    public UUID requestTransfer(GameProfile fromPlayer, GameProfile toPlayer, double amount, String description, @Nullable Context context) {
+        TransferRequest request = new TransferRequest(fromPlayer, toPlayer, amount, description, context);
 
         if (!requests.containsKey(fromPlayer.getId())) {
             requests.put(fromPlayer.getId(), new LinkedHashMap<>());
@@ -57,13 +71,6 @@ public class TransferManager {
             ChatUtils.sendMessage(player, String.join("\n",
                     "\n=== &bNew transfer request&r ===",
                     request.toString(),
-                    "========= &bActions&r =========",
-                    String.format(
-                            "&r[[&a&nAccept&r]](/fsmm transfer accept %s) " +
-                                    "&r[[&c&nReject&r]](/fsmm transfer reject %s) " +
-                                    "&r[[&b&nMy Balance&r]](/fsmm)",
-                            request.getId().toString(),
-                            request.getId().toString()),
                     "==========================" // this is padding after the button because the underline overlaps the next line
             ));
         }
@@ -100,12 +107,24 @@ public class TransferManager {
                     "&cTransfer request rejected"
             );
         }
+
+        if (!accepted) {
+            ChatUtils.sendMessage(
+                    PlayerUtils.getPlayer(request.getToPlayer()),
+                    "&c" + request.getFromPlayer().getName() + " rejected your transfer request."
+            );
+        }
+
         sendSignalToRequestContext(request, accepted);
         playerRequests.remove(requestId);
     }
 
     private void sendSignalToRequestContext(TransferRequest request, boolean success) {
-        request.getContext().signal(
+        Context context = request.getContext();
+        // we don't want to send signals if the context is null
+        if (context == null) return;
+
+        context.signal(
                 "fsmm_transfer",
                 request.getId().toString(),
                 request.getFromPlayer().getName(),
@@ -143,8 +162,15 @@ public class TransferManager {
         }
 
         if (success) {
-            ChatUtils.sendMessage(fromPlayer, "&aTransaction successful! New balance: &r"
-                    + Config.getWorthAsString(fromAccount.getBalance()));
+            if (PlayerUtils.isOnline(fromPlayer.getGameProfile())) {
+                ChatUtils.sendMessage(fromPlayer, "&aTransaction successful! New balance: &r"
+                        + Config.getWorthAsString(fromAccount.getBalance()));
+            }
+
+            if (PlayerUtils.isOnline(toPlayer)) {
+                ChatUtils.sendMessage(PlayerUtils.getPlayer(toPlayer), "&a" + fromPlayer.getGameProfile().getName()
+                        + " sent you &r" + Config.getWorthAsString((long) (amount * 1000)));
+            }
         } else {
             ChatUtils.sendMessage(fromPlayer, "&cError executing transaction: Insufficient funds.");
         }
@@ -186,12 +212,28 @@ public class TransferManager {
     protected void cleanupRequests() {
         Date now = new Date();
 
-        for (Map.Entry<UUID, LinkedHashMap<UUID, TransferRequest>> entry : requests.entrySet()) {
-            LinkedHashMap<UUID, TransferRequest> playerRequests = entry.getValue();
-            for (TransferRequest request : playerRequests.values()) {
-                if (request.getExpiryDate().before(now)) {
-                    playerRequests.remove(request.getId());
-                    sendSignalToRequestContext(request, false);
+        // use iterator approach to prevent ConcurrentModificationException
+        // see: https://stackoverflow.com/questions/602636/why-is-a-concurrentmodificationexception-thrown-and-how-to-debug-it
+        // see: https://stackoverflow.com/questions/16180568/concurrentmodificationexception-with-linkedhashmap
+        Iterator<LinkedHashMap<UUID, TransferRequest>> entryIterator = requests.values().iterator();
+        while (entryIterator.hasNext()) {
+            LinkedHashMap<UUID, TransferRequest> entry = entryIterator.next();
+
+            Iterator<TransferRequest> playerRequestIterator = entry.values().iterator();
+            while (playerRequestIterator.hasNext()) {
+                TransferRequest playerRequests = playerRequestIterator.next();
+                if (playerRequests.getExpiryDate().before(now)) {
+                    GameProfile toPlayer = playerRequests.getToPlayer();
+                    GameProfile fromPlayer = playerRequests.getFromPlayer();
+
+                    Context context = playerRequests.getContext();
+
+                    // if context is null the request was sent via command from a player
+                    if (context == null && PlayerUtils.isOnline(toPlayer)) {
+                        ChatUtils.sendMessage(PlayerUtils.getPlayer(toPlayer), "&cTransfer request for " + fromPlayer.getName() + " expired.");
+                    }
+                    sendSignalToRequestContext(playerRequests, false);
+                    playerRequestIterator.remove();
                 } else {
                     // if we encounter a value that is not yet expired, we can stop the loop as the LinkedHashMap is
                     // ordered by insertion order
@@ -200,8 +242,8 @@ public class TransferManager {
             }
 
             // clean up the map if it is empty to save memory and processing time for the next iteration
-            if (playerRequests.isEmpty()) {
-                requests.remove(entry.getKey());
+            if (entry.isEmpty()) {
+                entryIterator.remove();
             }
         }
     }

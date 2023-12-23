@@ -4,6 +4,7 @@ import com.fataldream.FatalAddons.fsmm.util.TransferManager;
 import com.mojang.authlib.GameProfile;
 import li.cil.oc.api.machine.Context;
 
+import javax.annotation.Nullable;
 import java.util.Date;
 import java.util.UUID;
 
@@ -17,6 +18,7 @@ public class TransferRequest {
     private final GameProfile fromPlayer;
     private final GameProfile toPlayer;
     private final double amount;
+    @Nullable
     private final Context context;
 
     private final String description;
@@ -27,12 +29,12 @@ public class TransferRequest {
     /**
      * Create a new transfer request.
      *
-     * @param fromPlayer  the name of the player who made the transfer request
-     * @param toPlayer    the name of the player who is receiving the transfer request
-     * @param amount      the amount of the transfer request
-     * @param context     the OpenComputers API context to send a signal detailing the transfer result
+     * @param fromPlayer the name of the player who made the transfer request
+     * @param toPlayer   the name of the player who is receiving the transfer request
+     * @param amount     the amount of the transfer request
+     * @param context    the OpenComputers API context to send a signal detailing the transfer result
      */
-    public TransferRequest(GameProfile fromPlayer, GameProfile toPlayer, double amount, Context context, String description) {
+    public TransferRequest(GameProfile fromPlayer, GameProfile toPlayer, double amount, String description, @Nullable Context context) {
 
         this.fromPlayer = fromPlayer;
         this.toPlayer = toPlayer;
@@ -76,7 +78,14 @@ public class TransferRequest {
                 "&bTo&r: &a" + toPlayer.getName(),
                 "&bAmount&r: &a" + amount + "&7F$",
                 "&bDescription&r: &a" + description,
-                "&bExpires in&r: &a" + ((expiryDate.getTime() - new Date().getTime()) / 1000) + " seconds"
+                "&bExpires in&r: &a" + ((expiryDate.getTime() - new Date().getTime()) / 1000) + " seconds",
+                "========= &bActions&r =========",
+                String.format(
+                        "&r[[&a&nAccept&r]](/fsmm transfer accept %s) " +
+                                "&r[[&c&nReject&r]](/fsmm transfer reject %s) " +
+                                "&r[[&b&nMy Balance&r]](/fsmm)",
+                        id.toString(),
+                        id.toString())
         );
     }
 }
