@@ -27,6 +27,9 @@ import net.minecraftforge.oredict.ShapelessOreRecipe;
 import javax.annotation.Nullable;
 import java.util.List;
 
+/**
+ * @author FatalMerlin <merlin.brandes@gmail.com>
+ */
 public class ATMCardDriver extends Item implements DriverItem, EnvironmentProvider {
     private static ATMCardDriver driver;
 
@@ -34,17 +37,6 @@ public class ATMCardDriver extends Item implements DriverItem, EnvironmentProvid
         setTranslationKey(FatalAddons.MODID + ".card_banking");
         setCreativeTab(CreativeTabs.MISC);
         setMaxDamage(0);
-    }
-
-    public static void postInit() {
-        ItemStack result = new ItemStack(driver, 1, 0);
-
-        GameRegistry.findRegistry(IRecipe.class).register(
-                new ShapelessOreRecipe(null,
-                        result,
-                        "oc:dataCard1", ForgeRegistries.ITEMS.getValue(new ResourceLocation("fsmm:1foney")))
-                        .setRegistryName(result.getItem().getRegistryName().getPath())
-        );
     }
 
     @Override
@@ -89,5 +81,16 @@ public class ATMCardDriver extends Item implements DriverItem, EnvironmentProvid
         Driver.add((EnvironmentProvider) driver);
         FatalAddons.registerItem(driver, "card_banking");
         FatalAddons.proxy.registerItemModel(driver, 0, "fataladdons:card_banking");
+    }
+
+    public static void postInit() {
+        ItemStack result = new ItemStack(driver, 1, 0);
+
+        GameRegistry.findRegistry(IRecipe.class).register(
+                new ShapelessOreRecipe(null,
+                        result,
+                        "oc:dataCard1", ForgeRegistries.ITEMS.getValue(new ResourceLocation("fsmm:1foney")))
+                        .setRegistryName(result.getItem().getRegistryName().getPath())
+        );
     }
 }
